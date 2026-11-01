@@ -1,0 +1,1097 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#191a1d">
+<title>To-Do</title>
+<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PHJlY3QgeD0iMiIgeT0iMiIgd2lkdGg9IjI4IiBoZWlnaHQ9IjI4IiByeD0iNyIgZmlsbD0iIzViYjBhMCIvPjxwYXRoIGQ9Ik05IDE2LjVsNC41IDQuNUwyMyAxMSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjwvc3ZnPg==">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.6/Sortable.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<style>
+  :root{
+    --bg:#191a1d; --surface:#1f2125; --elev:#26282d;
+    --ink:#e9e7e1; --muted:#9b9a95; --faint:#6f6e69;
+    --line:#2e3036; --line-soft:#26282d;
+    --accent:#5bb0a0; --accent-ink:#0e1a17;
+    --danger:#cf7367;
+    --radius:14px;
+    --tap:44px;
+  }
+  @media (prefers-color-scheme: light){
+    :root{
+      --bg:#f5f3ee; --surface:#ffffff; --elev:#ffffff;
+      --ink:#26241f; --muted:#6d6a63; --faint:#9a968d;
+      --line:#e4e0d8; --line-soft:#eeece5;
+      --accent:#2f8f7d; --accent-ink:#ffffff;
+      --danger:#b1503f;
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    -webkit-font-smoothing:antialiased; line-height:1.45;
+    padding-bottom:120px;
+  }
+  .wrap{max-width:640px; margin:0 auto; padding:0 16px}
+
+  /* Header */
+  header{
+    position:sticky; top:0; z-index:20;
+    background:color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter:saturate(1.4) blur(10px);
+    border-bottom:1px solid var(--line-soft);
+    padding:calc(env(safe-area-inset-top) + 10px) 0 10px;
+  }
+  .head-row{display:flex; align-items:center; gap:10px; max-width:640px; margin:0 auto; padding:0 16px}
+  .title{font-size:1.15rem; font-weight:650; letter-spacing:-0.01em; margin:0; flex:1; min-width:0;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .status-row{display:flex; align-items:center; justify-content:space-between; gap:10px;
+    max-width:640px; margin:6px auto 0; padding:0 16px}
+  .status{font-size:.78rem; color:var(--muted); display:flex; align-items:center; gap:6px; min-height:1.1em; min-width:0; flex:1}
+  .status #statusText{white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .status .dot{width:7px; height:7px; border-radius:50%; background:var(--faint); flex:none}
+  .status.clean .dot{background:var(--accent)}
+  .status.dirty .dot{background:#d8a24a}
+  .status.busy .dot{background:#d8a24a; animation:pulse 1s infinite}
+  .status.err .dot{background:var(--danger)}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+  .toolbtn{
+    appearance:none; border:1px solid var(--line); background:var(--surface); color:var(--muted);
+    width:36px; height:36px; border-radius:9px; padding:0; cursor:pointer; flex:none;
+    display:inline-flex; align-items:center; justify-content:center;
+  }
+  .toolbtn:active{transform:scale(.95); color:var(--ink)}
+  .toolbtn.on{background:var(--accent); color:var(--accent-ink); border-color:var(--accent)}
+  .toolbtn[disabled]{opacity:.35; pointer-events:none}
+  .toolbtn svg{width:18px; height:18px; display:block}
+
+  .iconbtn{
+    appearance:none; border:1px solid var(--line); background:var(--surface); color:var(--ink);
+    width:var(--tap); height:var(--tap); border-radius:11px; font-size:1.05rem;
+    display:inline-flex; align-items:center; justify-content:center; cursor:pointer; flex:none;
+  }
+  .iconbtn:active{transform:scale(.96)}
+  .save{
+    border:none; background:var(--accent); color:var(--accent-ink); font-weight:650;
+    padding:0 16px; height:var(--tap); border-radius:11px; cursor:pointer; font-size:.95rem; flex:none;
+  }
+  .save[disabled]{opacity:.4; pointer-events:none}
+
+  /* Sections */
+  main{margin-top:14px}
+  .section{margin:0 0 26px}
+  .sec-head{
+    display:flex; align-items:center; gap:8px;
+    font-size:1.05rem; font-weight:650; color:var(--muted); letter-spacing:.01em;
+    padding:0 4px 8px; border-bottom:1px solid var(--line-soft); margin-bottom:4px;
+  }
+  .sec-head .count{color:var(--faint); font-weight:500; font-size:.78rem}
+
+  /* Rows */
+  .row{
+    display:flex; align-items:flex-start; gap:12px;
+    padding:11px 4px; border-bottom:1px solid var(--line-soft);
+  }
+  .row:last-child{border-bottom:none}
+  .check{
+    flex:none; width:24px; height:24px; margin-top:1px; border-radius:7px;
+    border:1.5px solid var(--faint); background:transparent; cursor:pointer;
+    display:inline-flex; align-items:center; justify-content:center; padding:0;
+    transition:background .12s ease, border-color .12s ease, transform .08s ease;
+  }
+  .check svg{width:14px; height:14px; opacity:0; transform:scale(.6); transition:opacity .12s, transform .12s}
+  .check.done{background:var(--accent); border-color:var(--accent)}
+  .check.done svg{opacity:1; transform:scale(1); color:var(--accent-ink)}
+  .check:active{transform:scale(.88)}
+  .bullet-dot{flex:none; width:24px; margin-top:.55em; display:flex; justify-content:center}
+  .bullet-dot span{width:5px; height:5px; border-radius:50%; background:var(--faint)}
+
+  .text{flex:1; min-width:0; font-size:1rem; word-break:break-word; cursor:text; padding-top:1px}
+  .row.checked .text{color:var(--muted); text-decoration:line-through; text-decoration-color:var(--faint)}
+  .text-input{
+    flex:1; min-width:0; font:inherit; font-size:1rem; color:var(--ink);
+    background:var(--elev); border:1px solid var(--accent); border-radius:8px; padding:6px 8px;
+  }
+  .del{
+    flex:none; appearance:none; background:none; border:none; color:var(--faint);
+    width:32px; height:32px; border-radius:8px; cursor:pointer; font-size:1.1rem; line-height:1;
+    display:inline-flex; align-items:center; justify-content:center;
+  }
+  .del:active{color:var(--danger); background:color-mix(in srgb, var(--danger) 14%, transparent)}
+  .grip{
+    flex:none; align-self:stretch; width:26px; margin:-11px 0; padding:0 3px;
+    display:flex; align-items:center; justify-content:center;
+    color:var(--faint); cursor:grab; touch-action:none;
+  }
+  .grip:active{cursor:grabbing; color:var(--muted)}
+  .grip svg{width:12px; height:20px; display:block}
+  .items{min-height:2px}
+  .items:empty{min-height:34px; border-radius:8px}
+  .row.drag-ghost{opacity:.35}
+  .row.drag-chosen{background:var(--elev)}
+  .row.drag-float{
+    background:var(--elev); border:1px solid var(--line); border-radius:10px;
+    box-shadow:0 8px 24px rgba(0,0,0,.35); border-bottom:1px solid var(--line);
+  }
+  .sec-del{
+    flex:none; appearance:none; background:none; border:none; color:var(--faint);
+    width:30px; height:30px; border-radius:7px; cursor:pointer; font-size:1.05rem; line-height:1;
+    display:inline-flex; align-items:center; justify-content:center;
+  }
+  .sec-del:active{color:var(--danger); background:color-mix(in srgb, var(--danger) 14%, transparent)}
+  .sec-grip{
+    flex:none; display:inline-flex; align-items:center; justify-content:center;
+    width:22px; height:22px; margin-right:2px; color:var(--faint);
+    cursor:grab; touch-action:none;
+  }
+  .sec-grip:active{cursor:grabbing; color:var(--muted)}
+  .sec-grip svg{width:12px; height:18px; display:block}
+  .sec-head .editable{cursor:pointer; text-decoration:underline dotted; text-underline-offset:3px}
+  .sec-type{
+    flex:none; margin-left:auto; appearance:none; border:1px solid var(--line); background:var(--surface);
+    color:var(--muted); font:inherit; font-size:.72rem; font-weight:600;
+    padding:4px 10px; border-radius:999px; cursor:pointer;
+  }
+  .sec-type:active{transform:scale(.96)}
+  .sec-type.notes{background:var(--accent); color:var(--accent-ink); border-color:var(--accent)}
+  .section.sec-ghost{opacity:.4}
+  .section.sec-float{background:var(--elev); border-radius:12px; box-shadow:0 10px 28px rgba(0,0,0,.4)}
+
+  .add-row{
+    display:flex; align-items:center; gap:10px; padding:9px 4px; color:var(--muted);
+    cursor:pointer; font-size:.95rem;
+  }
+  .add-row .plus{width:24px; text-align:center; color:var(--accent); font-weight:700}
+  .add-row:active{color:var(--ink)}
+
+  .add-section{
+    display:block; width:100%; text-align:left; margin:6px 0 40px; padding:12px 14px;
+    background:var(--surface); border:1px dashed var(--line); border-radius:var(--radius);
+    color:var(--muted); font:inherit; font-size:.95rem; cursor:pointer;
+  }
+  .add-section:active{border-color:var(--accent); color:var(--ink)}
+
+  /* Panels (setup / message) */
+  .panel{
+    position:fixed; inset:0; z-index:40; background:var(--bg);
+    display:flex; align-items:flex-start; justify-content:center; overflow:auto;
+    padding:calc(env(safe-area-inset-top) + 24px) 16px 40px;
+  }
+  .panel[hidden]{display:none}
+  .card{width:100%; max-width:460px}
+  .card h1{font-size:1.4rem; letter-spacing:-0.02em; margin:0 0 4px}
+  .card p.sub{color:var(--muted); margin:0 0 22px; font-size:.95rem}
+  label{display:block; font-size:.82rem; color:var(--muted); margin:14px 0 5px}
+  input[type=text],input[type=password]{
+    width:100%; font:inherit; font-size:1rem; color:var(--ink);
+    background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:12px;
+  }
+  input:focus{outline:2px solid var(--accent); outline-offset:1px; border-color:transparent}
+  input[type=range]{accent-color:var(--accent); height:32px}
+  .hint{font-size:.78rem; color:var(--faint); margin:5px 0 0}
+  .hint a{color:var(--accent)}
+  .btn-primary{
+    width:100%; margin-top:22px; border:none; background:var(--accent); color:var(--accent-ink);
+    font-weight:650; font-size:1rem; padding:14px; border-radius:11px; cursor:pointer;
+  }
+  .btn-primary:active{transform:scale(.99)}
+  .btn-ghost{
+    width:100%; margin-top:10px; background:none; border:1px solid var(--line); color:var(--ink);
+    font:inherit; font-size:.95rem; padding:12px; border-radius:11px; cursor:pointer;
+  }
+  .row2{display:flex; gap:10px}
+  .row2>div{flex:1}
+  .pref-divider{height:1px; background:var(--line-soft); margin:24px 0 6px}
+  .toggle-row{
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    margin:16px 0 0; font-size:1rem; color:var(--ink); cursor:pointer; min-height:var(--tap);
+  }
+  .switch{
+    appearance:none; -webkit-appearance:none; position:relative; flex:none;
+    width:48px; height:28px; border-radius:999px; background:var(--line); border:none;
+    cursor:pointer; transition:background .15s ease;
+  }
+  .switch:checked{background:var(--accent)}
+  .switch::after{
+    content:""; position:absolute; top:3px; left:3px; width:22px; height:22px; border-radius:50%;
+    background:#fff; transition:transform .15s ease;
+  }
+  .switch:checked::after{transform:translateX(20px)}
+  .switch:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+  .panel-msg{text-align:center; padding-top:12vh}
+  .panel-msg .emoji{font-size:2rem}
+  .panel-msg h2{font-size:1.2rem; margin:14px 0 6px; letter-spacing:-0.01em}
+  .panel-msg p{color:var(--muted); margin:0 auto 20px; max-width:340px; font-size:.95rem}
+  .err-detail{font-size:.8rem; color:var(--faint); word-break:break-word; margin-top:4px}
+  @media (prefers-reduced-motion: reduce){*{transition:none !important; animation:none !important}}
+</style>
+</head>
+<body>
+
+<!-- App shell -->
+<header hidden id="appHeader">
+  <div class="head-row">
+    <button class="iconbtn" id="btnRefresh" title="Refresh from GitHub" aria-label="Refresh">&#8635;</button>
+    <h1 class="title" id="listTitle">To-Do</h1>
+    <button class="save" id="btnSave" disabled>Save</button>
+    <button class="iconbtn" id="btnSettings" title="Settings" aria-label="Settings">&#9881;</button>
+  </div>
+  <div class="status-row">
+    <div class="status" id="status"><span class="dot"></span><span id="statusText">Loading…</span></div>
+    <button class="toolbtn" id="btnArchive" hidden aria-label="Move completed to archive"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8"/><path d="M10 12h4"/></svg></button>
+    <button class="toolbtn" id="btnUndo" hidden disabled aria-label="Undo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 6 6v1"/></svg></button>
+    <button class="toolbtn" id="btnEdit" hidden aria-label="Edit sections"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+  </div>
+</header>
+
+<div class="wrap"><main id="list" hidden></main></div>
+
+<!-- Setup panel -->
+<div class="panel" id="setup">
+  <div class="card">
+    <h1>Connect your list</h1>
+    <p class="sub">This app edits one markdown file in your GitHub repo. Nothing is stored anywhere but your own browser.</p>
+
+    <div class="row2">
+      <div>
+        <label for="owner">GitHub username</label>
+        <input type="text" id="owner" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="e.g. nick">
+      </div>
+      <div>
+        <label for="repo">Repository</label>
+        <input type="text" id="repo" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="e.g. notes">
+      </div>
+    </div>
+
+    <label for="path">File path in the repo</label>
+    <input type="text" id="path" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="To-Do-2026.md">
+    <p class="hint">Include folders if it's nested, e.g. <code>lists/To-Do-2026.md</code></p>
+
+    <label for="archivePath">Completed-items file <span style="color:var(--faint)">(optional)</span></label>
+    <input type="text" id="archivePath" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Done.md" value="Done.md">
+    <p class="hint">Another file in the same repo. The archive button moves ticked items here as a plain completed list. Leave blank to hide the button.</p>
+
+    <label for="branch">Branch</label>
+    <input type="text" id="branch" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="master" value="master">
+
+    <label for="token">Access token</label>
+    <input type="password" id="token" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="github_pat_…">
+    <p class="hint">A fine-grained token with <strong>Contents: Read and write</strong> on just this repo. <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Create one</a>.</p>
+
+    <div class="pref-divider"></div>
+    <label class="toggle-row" for="autosave">
+      <span>Autosave changes</span>
+      <input type="checkbox" id="autosave" class="switch" checked>
+    </label>
+    <div id="autosaveDelayWrap" style="display:none">
+      <label for="autosaveDelay">Save this many seconds after I stop editing</label>
+      <input type="text" inputmode="numeric" id="autosaveDelay" value="6">
+    </div>
+    <p class="hint">When on, changes commit to GitHub on their own a few seconds after you stop. Best left off unless this app is the only thing editing the file.</p>
+
+    <label for="fontScale">Text size</label>
+    <div style="display:flex; align-items:center; gap:12px">
+      <input type="range" id="fontScale" min="12" max="20" step="1" value="16" style="flex:1">
+      <span id="fontScaleVal" style="color:var(--muted); font-size:.85rem; min-width:3.4em; text-align:right">16 px</span>
+    </div>
+    <p class="hint">Drag to shrink or enlarge the list text — smaller fits more on screen. Saved per device.</p>
+
+    <button class="btn-primary" id="btnConnect">Connect</button>
+    <button class="btn-ghost" id="btnCancelSetup" hidden>Cancel</button>
+    <p class="hint" id="setupErr" style="color:var(--danger)"></p>
+  </div>
+</div>
+
+<!-- Message panel (errors / empty) -->
+<div class="panel" id="msg" hidden>
+  <div class="card panel-msg">
+    <div class="emoji" id="msgEmoji">🙂</div>
+    <h2 id="msgTitle"></h2>
+    <p id="msgBody"></p>
+    <button class="btn-primary" id="msgAction"></button>
+    <button class="btn-ghost" id="msgSettings">Open settings</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+var CFG_KEY = "todo-gh-config-v1";
+var cfg = null;
+var model = [];
+var currentSha = null;
+var endsWithNewline = true;
+var dirty = false;
+var saving = false;
+var changeSeq = 0;
+var autosaveTimer = null;
+var sectionEdit = false;
+
+// ---------- storage ----------
+function loadCfg(){
+  try{ var raw = localStorage.getItem(CFG_KEY); return raw ? JSON.parse(raw) : null; }
+  catch(e){ return null; }
+}
+function saveCfg(c){
+  try{ localStorage.setItem(CFG_KEY, JSON.stringify(c)); }catch(e){}
+}
+
+// ---------- base64 (utf-8 safe) ----------
+function utf8ToB64(str){
+  var bytes = new TextEncoder().encode(str), bin = "", chunk = 0x8000;
+  for(var i=0;i<bytes.length;i+=chunk){ bin += String.fromCharCode.apply(null, bytes.subarray(i,i+chunk)); }
+  return btoa(bin);
+}
+function b64ToUtf8(b64){
+  var bin = atob((b64||"").replace(/\n/g,"")), bytes = new Uint8Array(bin.length);
+  for(var i=0;i<bin.length;i++){ bytes[i]=bin.charCodeAt(i); }
+  return new TextDecoder().decode(bytes);
+}
+
+// ---------- github api ----------
+function apiUrlFor(path){
+  var p = path.split("/").map(encodeURIComponent).join("/");
+  return "https://api.github.com/repos/"+encodeURIComponent(cfg.owner)+"/"+encodeURIComponent(cfg.repo)+"/contents/"+p;
+}
+function headers(){
+  return {
+    "Authorization":"Bearer "+cfg.token,
+    "Accept":"application/vnd.github+json",
+    "X-GitHub-Api-Version":"2022-11-28"
+  };
+}
+// read any file; returns {text, sha} or null if it doesn't exist (404)
+async function ghGetPath(path){
+  var res = await fetch(apiUrlFor(path)+"?ref="+encodeURIComponent(cfg.branch), {headers:headers()});
+  if(res.status===404) return null;
+  if(res.status===401) throw {code:401};
+  if(!res.ok) throw {code:res.status, msg:(await res.text())};
+  var data = await res.json();
+  return {text:b64ToUtf8(data.content), sha:data.sha};
+}
+// write any file; pass sha to update, or null to create; returns the response
+async function ghPutPath(path, text, sha, message){
+  var body = {message:message, content:utf8ToB64(text), branch:cfg.branch};
+  if(sha) body.sha = sha;
+  var res = await fetch(apiUrlFor(path), {method:"PUT", headers:headers(), body:JSON.stringify(body)});
+  if(res.status===401) throw {code:401};
+  if(res.status===409 || res.status===422) throw {code:409};
+  if(!res.ok) throw {code:res.status, msg:(await res.text())};
+  return await res.json();
+}
+// main-file wrappers (track currentSha)
+async function ghGet(){
+  var r = await ghGetPath(cfg.path);
+  if(r===null) throw {code:404};
+  return r;
+}
+async function ghPut(text, message){
+  var data = await ghPutPath(cfg.path, text, currentSha, message);
+  currentSha = data.content.sha;
+}
+
+// ---------- parse / serialize markdown ----------
+function parse(md){
+  endsWithNewline = /\n$/.test(md);
+  var lines = md.split("\n");
+  if(endsWithNewline) lines.pop(); // drop trailing empty from final newline
+  return lines.map(function(raw){
+    var m;
+    if((m = raw.match(/^(#{1,6})\s+(.*)$/))){
+      var ht = m[2], notes = false;
+      var mm = ht.match(/^(.*?)\s*<!--\s*notes\s*-->\s*$/);
+      if(mm){ notes = true; ht = mm[1]; }
+      return {type:"heading", level:m[1].length, text:ht, notes:notes};
+    }
+    if((m = raw.match(/^(\s*)- \[([ xX])\]\s?(.*)$/))) return {type:"task", indent:m[1], done:m[2].toLowerCase()==="x", text:m[3]};
+    if((m = raw.match(/^(\s*)[-*]\s+(.*)$/)))          return {type:"bullet", indent:m[1], text:m[2]};
+    if(raw.trim()==="")                                return {type:"blank"};
+    return {type:"text", text:raw};
+  });
+}
+function serialize(){
+  var out = model.map(function(n){
+    if(n.type==="heading") return "#".repeat(n.level)+" "+n.text+(n.notes?" <!--notes-->":"");
+    if(n.type==="task")    return n.indent+"- ["+(n.done?"x":" ")+"] "+n.text;
+    if(n.type==="bullet")  return n.indent+"- "+n.text;
+    if(n.type==="blank")   return "";
+    return n.text;
+  }).join("\n");
+  return endsWithNewline ? out+"\n" : out;
+}
+
+// ---------- state helpers ----------
+function setDirty(v){
+  dirty = v;
+  document.getElementById("btnSave").disabled = !v;
+  if(v){
+    changeSeq++;
+    if(cfg && cfg.autosave){ setStatus("dirty","Autosaving…"); scheduleAutosave(); }
+    else setStatus("dirty","Unsaved changes");
+  } else {
+    clearAutosave();
+    setStatus("clean","All saved");
+  }
+}
+function setStatus(kind, text){
+  var el = document.getElementById("status");
+  el.className = "status "+kind;
+  document.getElementById("statusText").textContent = text;
+}
+function clearAutosave(){ if(autosaveTimer){ clearTimeout(autosaveTimer); autosaveTimer = null; } }
+function scheduleAutosave(){
+  if(!cfg || !cfg.autosave) return;
+  clearAutosave();
+  var secs = Math.max(1, parseInt(cfg.autosaveDelay, 10) || 4);
+  autosaveTimer = setTimeout(function(){
+    autosaveTimer = null;
+    if(dirty && !saving) save(true);
+  }, secs*1000);
+}
+function updateAutosaveUI(){
+  document.getElementById("autosaveDelayWrap").style.display =
+    document.getElementById("autosave").checked ? "" : "none";
+}
+function applyFontSize(px){
+  px = parseInt(px, 10);
+  if(!px || px < 10 || px > 28) px = 16;
+  document.documentElement.style.fontSize = px + "px";
+}
+
+// ---------- render ----------
+function el(tag, cls, txt){ var e=document.createElement(tag); if(cls)e.className=cls; if(txt!=null)e.textContent=txt; return e; }
+var CHECK_SVG = '<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+var GRIP_SVG = '<svg viewBox="0 0 12 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><circle cx="3" cy="4" r="1.4"/><circle cx="9" cy="4" r="1.4"/><circle cx="3" cy="10" r="1.4"/><circle cx="9" cy="10" r="1.4"/><circle cx="3" cy="16" r="1.4"/><circle cx="9" cy="16" r="1.4"/></svg>';
+var sortables = [];
+function hasSortable(){ return typeof Sortable !== "undefined" && !!Sortable; }
+function destroySortables(){ sortables.forEach(function(s){ try{ s.destroy(); }catch(e){} }); sortables = []; }
+
+function render(){
+  var list = document.getElementById("list");
+  destroySortables();
+  list.innerHTML = "";
+
+  // group nodes into sections by heading
+  var groups = [];
+  var current = {heading:null, items:[]};
+  model.forEach(function(n){
+    if(n.type==="heading"){
+      if(current.heading || current.items.length) groups.push(current);
+      current = {heading:n, items:[]};
+    } else if(n.type==="task" || n.type==="bullet"){
+      current.items.push(n);
+    }
+  });
+  if(current.heading || current.items.length) groups.push(current);
+
+  var sectionsWrap = el("div"); sectionsWrap.id = "sections";
+
+  groups.forEach(function(g){
+    var sec = el("section","section");
+    sec.__heading = g.heading || null;
+    if(g.heading){
+      var h = el("div","sec-head");
+      if(sectionEdit && hasSortable()){
+        var sgrip = el("div","sec-grip"); sgrip.innerHTML = GRIP_SVG;
+        sgrip.setAttribute("aria-label","Drag to reorder section");
+        h.appendChild(sgrip);
+      }
+      var titleSpan = el("span", sectionEdit?"editable":null, g.heading.text);
+      if(sectionEdit){ (function(head){ titleSpan.onclick = function(){ renameSection(head); }; })(g.heading); }
+      h.appendChild(titleSpan);
+      if(!sectionEdit){
+        var tasks = g.items.filter(function(n){return n.type==="task";});
+        if(tasks.length){
+          var doneCount = tasks.filter(function(n){return n.done;}).length;
+          h.appendChild(el("span","count", doneCount+"/"+tasks.length));
+        }
+      }
+      if(sectionEdit){
+        var note = isNoteSection(g.heading);
+        var stype = el("button","sec-type"+(note?" notes":""), note?"Notes":"Tasks");
+        stype.setAttribute("aria-label","Switch between a task list and a notes list");
+        (function(head){ stype.onclick = function(){ toggleSectionType(head); }; })(g.heading);
+        h.appendChild(stype);
+        var sdel = el("button","sec-del","\u00d7");
+        sdel.setAttribute("aria-label","Delete section");
+        (function(head){ sdel.onclick = function(){ deleteSection(head); }; })(g.heading);
+        h.appendChild(sdel);
+      }
+      sec.appendChild(h);
+    }
+    var itemsEl = el("div","items");
+    itemsEl.__heading = g.heading || null;
+    g.items.forEach(function(n){ itemsEl.appendChild(renderRow(n)); });
+    sec.appendChild(itemsEl);
+    sec.appendChild(renderAddRow(g.heading));
+    sectionsWrap.appendChild(sec);
+  });
+
+  list.appendChild(sectionsWrap);
+
+  var addSec = el("button","add-section","+  New section");
+  addSec.onclick = addSection;
+  list.appendChild(addSec);
+
+  initSortables();
+}
+
+function renderRow(node){
+  var row = el("div","row"+(node.type==="task"&&node.done?" checked":""));
+  row.__node = node;
+  if(hasSortable() && !sectionEdit){
+    var grip = el("div","grip"); grip.innerHTML = GRIP_SVG;
+    grip.setAttribute("aria-label","Drag to reorder");
+    row.appendChild(grip);
+  }
+  if(node.type==="task"){
+    var chk = el("button","check"+(node.done?" done":""));
+    chk.setAttribute("aria-label", node.done?"Mark not done":"Mark done");
+    chk.innerHTML = CHECK_SVG;
+    chk.onclick = function(){ toggle(node, row, chk); };
+    row.appendChild(chk);
+  } else {
+    var bd = el("div","bullet-dot"); bd.appendChild(el("span")); row.appendChild(bd);
+  }
+  var txt = el("div","text", node.text || "");
+  txt.onclick = function(){ editText(node, txt); };
+  row.appendChild(txt);
+
+  var del = el("button","del","\u00d7");
+  del.setAttribute("aria-label","Delete");
+  del.onclick = function(){ deleteNode(node); };
+  row.appendChild(del);
+  return row;
+}
+
+function initSortables(){
+  if(!hasSortable()) return;
+  if(sectionEdit){
+    var wrap = document.getElementById("sections");
+    if(wrap){
+      sortables.push(Sortable.create(wrap, {
+        group:"sections", draggable:".section", handle:".sec-grip", animation:150,
+        forceFallback:true, fallbackOnBody:true, swapThreshold:0.6,
+        ghostClass:"sec-ghost", dragClass:"sec-float",
+        scroll:true, scrollSensitivity:60,
+        onEnd:onSectionDrop
+      }));
+    }
+    return;
+  }
+  var containers = document.getElementById("list").querySelectorAll(".items");
+  Array.prototype.forEach.call(containers, function(c){
+    sortables.push(Sortable.create(c, {
+      group:"todo", handle:".grip", animation:150,
+      forceFallback:true, fallbackOnBody:true, swapThreshold:0.6,
+      ghostClass:"drag-ghost", chosenClass:"drag-chosen", dragClass:"drag-float",
+      scroll:true, scrollSensitivity:60,
+      onEnd:onDrop
+    }));
+  });
+}
+function onDrop(evt){
+  var node = evt.item && evt.item.__node;
+  var headingNode = (evt.to && evt.to.__heading) || null;
+  var newIndex = evt.newIndex;
+  // defer so the model change + clean re-render happen after Sortable settles
+  setTimeout(function(){
+    if(!node){ rerender(); return; }
+    pushUndo();
+    moveNodeTo(node, headingNode, newIndex);
+    setDirty(true);
+    rerender();
+  }, 0);
+}
+function onSectionDrop(){
+  var wrap = document.getElementById("sections");
+  var order = [];
+  if(wrap){
+    Array.prototype.forEach.call(wrap.querySelectorAll(".section"), function(s){ order.push(s.__heading || null); });
+  }
+  setTimeout(function(){
+    pushUndo();
+    reorderSections(order);
+    setDirty(true);
+    rerender();
+  }, 0);
+}
+// rebuild the model so whole section blocks follow the given heading order
+function reorderSections(order){
+  var blocks = [], cur = {heading:null, nodes:[]};
+  for(var i=0;i<model.length;i++){
+    var n = model[i];
+    if(n.type==="heading"){ blocks.push(cur); cur = {heading:n, nodes:[n]}; }
+    else cur.nodes.push(n);
+  }
+  blocks.push(cur);
+  var leading = (blocks.length && blocks[0].heading===null) ? blocks.shift() : {heading:null, nodes:[]};
+  var newModel = leading.nodes.slice(), used = [];
+  order.forEach(function(h){
+    if(!h) return;
+    for(var b=0;b<blocks.length;b++){
+      if(used.indexOf(b)<0 && blocks[b].heading===h){ newModel = newModel.concat(blocks[b].nodes); used.push(b); break; }
+    }
+  });
+  for(var b=0;b<blocks.length;b++){ if(used.indexOf(b)<0) newModel = newModel.concat(blocks[b].nodes); }
+  model = newModel;
+}
+
+// a section marked with the hidden notes flag holds plain notes (bullets), not checkbox tasks
+function isNoteSection(heading){
+  return !!(heading && heading.notes);
+}
+function toggleSectionType(headingNode){
+  pushUndo();
+  headingNode.notes = !headingNode.notes;
+  setDirty(true); rerender();
+}
+function renderAddRow(heading){
+  var add = el("div","add-row");
+  add.innerHTML = '<span class="plus">+</span><span>'+(isNoteSection(heading)?'Add note':'Add task')+'</span>';
+  add.onclick = function(){ startAdd(heading, add); };
+  return add;
+}
+
+// ---------- edits ----------
+function toggle(node, row, chk){
+  pushUndo();
+  node.done = !node.done;
+  chk.classList.toggle("done", node.done);
+  row.classList.toggle("checked", node.done);
+  // update the section counter (row is inside .items, which is inside .section)
+  var itemsEl = row.parentNode;
+  var section = itemsEl && itemsEl.parentNode;
+  var head = section && section.querySelector(".sec-head .count");
+  if(head && itemsEl){
+    var checks = itemsEl.querySelectorAll(".check");
+    var done=0,total=0;
+    Array.prototype.forEach.call(checks, function(c){ total++; if(c.classList.contains("done")) done++; });
+    head.textContent = done+"/"+total;
+  }
+  setDirty(true);
+}
+
+function editText(node, span){
+  var input = el("input","text-input"); input.type="text"; input.value = node.text;
+  span.replaceWith(input); input.focus();
+  var caret = input.value.length; input.setSelectionRange(caret, caret);
+  function commit(save){
+    var oldVal = node.text;
+    var val = save ? input.value : oldVal;
+    var changed = save && val !== oldVal;
+    if(changed) pushUndo();
+    node.text = val;
+    var newSpan = el("div","text", val);
+    newSpan.onclick = function(){ editText(node, newSpan); };
+    if(input.parentNode) input.replaceWith(newSpan);
+    if(changed) setDirty(true);
+  }
+  input.onblur = function(){ commit(true); };
+  input.onkeydown = function(e){
+    if(e.key==="Enter"){ e.preventDefault(); input.blur(); }
+    else if(e.key==="Escape"){ input.onblur=null; commit(false); }
+  };
+}
+
+function indexOfHeading(heading){
+  if(!heading) return -1;
+  return model.indexOf(heading);
+}
+function startAdd(heading, addRowEl){
+  var note = isNoteSection(heading);
+  var input = el("input","text-input"); input.type="text"; input.placeholder = note ? "New note…" : "New task…";
+  var holder = el("div","row");
+  holder.appendChild(el("div","bullet-dot")).appendChild(el("span"));
+  holder.appendChild(input);
+  addRowEl.replaceWith(holder); input.focus();
+  var committed = false;
+  function commit(save){
+    if(committed) return;      // guard: only ever add once
+    committed = true;
+    input.onblur = null;       // stop the re-render's blur from re-triggering us
+    var val = input.value.trim();
+    if(save && val){
+      pushUndo();
+      var node = note ? {type:"bullet", indent:"", text:val}
+                      : {type:"task", indent:"", done:false, text:val};
+      insertIntoSection(heading, node);
+      setDirty(true);
+    }
+    render();
+  }
+  input.onblur = function(){ commit(true); };
+  input.onkeydown = function(e){
+    if(e.key==="Enter"){ e.preventDefault(); commit(true); }
+    else if(e.key==="Escape"){ commit(false); }
+  };
+}
+function insertIntoSection(heading, node){
+  var start = heading ? indexOfHeading(heading) : -1;
+  // find end of section: next heading after start, else end
+  var end = model.length;
+  for(var i=start+1;i<model.length;i++){ if(model[i].type==="heading"){ end=i; break; } }
+  // insert after last non-blank node within the section
+  var pos = start+1;
+  for(var j=start+1;j<end;j++){ if(model[j].type!=="blank") pos = j+1; }
+  if(pos<=start) pos = start+1;
+  model.splice(pos, 0, node);
+}
+
+function deleteNode(node){
+  var i = model.indexOf(node);
+  if(i>=0){ pushUndo(); model.splice(i,1); setDirty(true); rerender(); }
+}
+
+function addSection(){
+  var name = prompt("New section name:");
+  if(!name) return;
+  name = name.trim(); if(!name) return;
+  pushUndo();
+  if(model.length && model[model.length-1].type!=="blank") model.push({type:"blank"});
+  model.push({type:"heading", level:2, text:name});
+  model.push({type:"blank"});
+  setDirty(true); render();
+}
+
+function renameSection(headingNode){
+  var name = prompt("Rename section:", headingNode.text);
+  if(name===null) return;
+  name = name.trim();
+  if(!name || name===headingNode.text) return;
+  pushUndo();
+  headingNode.text = name;
+  setDirty(true); rerender();
+}
+
+// re-render without losing the scroll position (nice for nudging items around)
+function rerender(){
+  var y = (typeof window!=="undefined" && window.pageYOffset) || 0;
+  render();
+  if(typeof window!=="undefined" && window.scrollTo) window.scrollTo(0, y);
+}
+
+// ---------- undo (last 5 changes) ----------
+var undoStack = [];
+function pushUndo(){
+  undoStack.push(JSON.parse(JSON.stringify(model)));
+  if(undoStack.length > 5) undoStack.shift();
+  updateUndoBtn();
+}
+function updateUndoBtn(){
+  var b = document.getElementById("btnUndo");
+  if(b) b.disabled = undoStack.length === 0;
+}
+function undo(){
+  if(!undoStack.length) return;
+  model = undoStack.pop();
+  setDirty(true);
+  updateUndoBtn();
+  rerender();
+}
+
+// move a task/bullet to a target section at a given item position (from a drag drop)
+function moveNodeTo(node, headingNode, itemIndex){
+  var from = model.indexOf(node);
+  if(from < 0) return;
+  model.splice(from, 1);
+  var start = headingNode ? model.indexOf(headingNode) : -1;
+  var end = model.length;
+  for(var i=start+1;i<model.length;i++){ if(model[i].type==="heading"){ end=i; break; } }
+  var itemIdx = [];
+  for(var j=start+1;j<end;j++){ if(model[j].type==="task" || model[j].type==="bullet") itemIdx.push(j); }
+  var pos;
+  if(itemIndex == null || itemIndex >= itemIdx.length){
+    if(itemIdx.length) pos = itemIdx[itemIdx.length-1] + 1;
+    else { pos = start+1; while(model[pos] && model[pos].type==="blank") pos++; }
+  } else {
+    pos = itemIdx[itemIndex];
+  }
+  model.splice(pos, 0, node);
+}
+
+// delete a whole section (its heading + items), always with a confirm
+function deleteSection(headingNode){
+  var start = model.indexOf(headingNode);
+  if(start<0) return;
+  var end = model.length;
+  for(var i=start+1;i<model.length;i++){ if(model[i].type==="heading"){ end=i; break; } }
+  var count=0;
+  for(var j=start+1;j<end;j++){ if(model[j].type==="task" || model[j].type==="bullet") count++; }
+  var msg = count>0
+    ? 'Remove section "'+headingNode.text+'" and its '+count+' item'+(count===1?'':'s')+'?'
+    : 'Remove section "'+headingNode.text+'"?';
+  if(!confirm(msg)) return;
+  pushUndo();
+  model.splice(start, end-start);
+  setDirty(true); rerender();
+}
+
+// ---------- archive completed ----------
+function archiveEnabled(){
+  return !!(cfg && cfg.archivePath && cfg.archivePath !== cfg.path);
+}
+function updateArchiveBtn(){
+  var b = document.getElementById("btnArchive");
+  if(b) b.hidden = !archiveEnabled();
+}
+async function archiveCompleted(){
+  if(!archiveEnabled() || saving) return;
+  var done = model.filter(function(n){ return n.type==="task" && n.done; });
+  if(!done.length){ setStatus("clean","No completed items to move"); return; }
+  var name = cfg.archivePath.split("/").pop();
+  if(!confirm("Move "+done.length+" completed item"+(done.length===1?'':'s')+" to "+name+"?")) return;
+
+  saving = true;
+  clearAutosave();
+  setStatus("busy","Archiving…");
+  document.getElementById("btnArchive").disabled = true;
+  document.getElementById("btnSave").disabled = true;
+  try{
+    // 1) append the ticked items to the archive file (create it if missing) — do this FIRST
+    var stamp = new Date().toLocaleString();
+    var addition = done.map(function(n){ return "- [x] " + n.text; }).join("\n") + "\n";
+    var arch = await ghGetPath(cfg.archivePath);   // {text, sha} or null
+    var archText;
+    if(arch){
+      archText = arch.text;
+      if(archText.length && !/\n$/.test(archText)) archText += "\n";
+      archText += addition;
+    } else {
+      archText = addition;
+    }
+    await ghPutPath(cfg.archivePath, archText, arch ? arch.sha : null, "Archive completed — "+stamp);
+
+    // 2) remove the ticked items from the main list (keep section headers) and save it
+    var prevModel = model, mutated = false;
+    model = model.filter(function(n){ return !(n.type==="task" && n.done); });
+    mutated = true;
+    await ghPut(serialize(), "Move completed to archive — "+stamp);
+
+    saving = false;
+    dirty = false;
+    changeSeq++;                 // invalidate any in-flight autosave comparison
+    undoStack = [];              // archive is a commit point; reset undo history
+    updateUndoBtn();
+    document.getElementById("btnArchive").disabled = false;
+    rerender();
+    setStatus("clean","Moved "+done.length+" to "+name);
+  }catch(e){
+    saving = false;
+    if(mutated){ model = prevModel; rerender(); }   // main save failed — put items back (they're safe in the archive)
+    document.getElementById("btnArchive").disabled = false;
+    document.getElementById("btnSave").disabled = !dirty;
+    handleError(e, "archive");
+  }
+}
+
+// ---------- load / save ----------
+async function load(){
+  showApp();
+  setStatus("busy","Loading…");
+  try{
+    var r = await ghGet();
+    model = parse(r.text);
+    currentSha = r.sha;
+    dirty = false;
+    document.getElementById("btnSave").disabled = true;
+    render();
+    document.getElementById("list").hidden = false;
+    undoStack = [];
+    var ub = document.getElementById("btnUndo");
+    ub.hidden = false; ub.disabled = true;
+    sectionEdit = false;
+    var eb = document.getElementById("btnEdit");
+    eb.hidden = false; eb.classList.remove("on");
+    updateArchiveBtn();
+    setStatus("clean","All saved");
+  }catch(e){ handleError(e, "load"); }
+}
+
+async function save(isAuto){
+  if(!dirty || saving) return;
+  clearAutosave();
+  saving = true;
+  var seq = changeSeq;
+  setStatus("busy","Saving…");
+  document.getElementById("btnSave").disabled = true;
+  try{
+    var stamp = new Date().toLocaleString();
+    await ghPut(serialize(), "Update to-do — "+stamp);
+    saving = false;
+    if(changeSeq === seq){
+      setDirty(false);               // nothing changed while we saved
+    } else {
+      // edits arrived mid-save — keep them pending so they get saved too
+      document.getElementById("btnSave").disabled = false;
+      if(cfg && cfg.autosave){ setStatus("dirty","Autosaving…"); scheduleAutosave(); }
+      else setStatus("dirty","Unsaved changes");
+    }
+  }catch(e){
+    saving = false;
+    document.getElementById("btnSave").disabled = false;
+    if(e.code===409){
+      setStatus("err","Changed on GitHub — refresh first");
+      showMsg("🔄","This list changed elsewhere",
+        "Someone (or another device) saved a newer version. Refresh to pull it in, then re-apply your changes.",
+        "Refresh now", function(){ hideMsg(); load(); });
+    } else if(isAuto && e.message && /Failed to fetch|NetworkError|Load failed/i.test(e.message)){
+      // background blip: don't interrupt with a modal; retry on next edit or manual Save
+      setStatus("err","Autosave failed — tap Save to retry");
+    } else { handleError(e, "save"); }
+  }
+}
+
+function handleError(e, where){
+  if(e.code===401){
+    setStatus("err","Token rejected");
+    showMsg("🔑","Access token was rejected",
+      "The token is missing, expired, or lacks Contents write access to this repo. Update it in settings.",
+      "Open settings", openSetup);
+  } else if(e.code===404){
+    setStatus("err","File not found");
+    showMsg("🔍","Couldn't find that file",
+      "Check the username, repository, branch, and file path are exactly right — they're case-sensitive.",
+      "Open settings", openSetup);
+  } else if(e.message && /Failed to fetch|NetworkError|Load failed/i.test(e.message)){
+    setStatus("err","No connection");
+    showMsg("📡","Can't reach GitHub",
+      "Check your internet connection and try again.",
+      "Try again", function(){ hideMsg(); (where==="save"?save:load)(); });
+  } else {
+    setStatus("err","Something went wrong");
+    var det = e.msg ? String(e.msg).slice(0,180) : (e.message||("HTTP "+(e.code||"?")));
+    showMsg("⚠️","Something went wrong",
+      "GitHub returned an error. You can try again or check your settings.",
+      "Try again", function(){ hideMsg(); (where==="save"?save:load)(); }, det);
+  }
+}
+
+// ---------- panels ----------
+function showApp(){
+  document.getElementById("setup").hidden = true;
+  document.getElementById("appHeader").hidden = false;
+}
+function showMsg(emoji, title, body, action, fn, detail){
+  document.getElementById("msgEmoji").textContent = emoji;
+  document.getElementById("msgTitle").textContent = title;
+  document.getElementById("msgBody").textContent = body;
+  var b = document.getElementById("msgAction");
+  b.textContent = action; b.onclick = fn;
+  var existing = document.querySelector(".err-detail"); if(existing) existing.remove();
+  if(detail){
+    var d = el("p","err-detail", detail);
+    document.getElementById("msgBody").after(d);
+  }
+  document.getElementById("msg").hidden = false;
+}
+function hideMsg(){ document.getElementById("msg").hidden = true; }
+
+function openSetup(){
+  hideMsg();
+  if(cfg){
+    document.getElementById("owner").value = cfg.owner||"";
+    document.getElementById("repo").value = cfg.repo||"";
+    document.getElementById("path").value = cfg.path||"";
+    document.getElementById("branch").value = cfg.branch||"master";
+    document.getElementById("token").value = cfg.token||"";
+    document.getElementById("btnCancelSetup").hidden = false;
+  }
+  document.getElementById("autosave").checked = cfg ? !!cfg.autosave : true;
+  document.getElementById("autosaveDelay").value = (cfg && cfg.autosaveDelay) ? cfg.autosaveDelay : 6;
+  document.getElementById("archivePath").value = (cfg && cfg.archivePath) ? cfg.archivePath : "Done.md";
+  var fpx = (cfg && cfg.fontPx) ? cfg.fontPx : 16;
+  document.getElementById("fontScale").value = fpx;
+  document.getElementById("fontScaleVal").textContent = fpx + " px";
+  updateAutosaveUI();
+  document.getElementById("btnConnect").textContent = cfg ? "Save settings" : "Connect";
+  document.getElementById("setupErr").textContent = "";
+  document.getElementById("setup").hidden = false;
+  document.getElementById("appHeader").hidden = true;
+}
+
+// ---------- wire up ----------
+document.getElementById("btnConnect").onclick = function(){
+  var c = {
+    owner:  document.getElementById("owner").value.trim(),
+    repo:   document.getElementById("repo").value.trim(),
+    path:   document.getElementById("path").value.trim(),
+    branch: document.getElementById("branch").value.trim() || "master",
+    token:  document.getElementById("token").value.trim(),
+    archivePath: document.getElementById("archivePath").value.trim(),
+    autosave: document.getElementById("autosave").checked,
+    autosaveDelay: Math.max(1, parseInt(document.getElementById("autosaveDelay").value, 10) || 6),
+    fontPx: Math.max(10, Math.min(28, parseInt(document.getElementById("fontScale").value, 10) || 16))
+  };
+  if(!c.owner || !c.repo || !c.path || !c.token){
+    document.getElementById("setupErr").textContent = "Fill in username, repository, file path, and token.";
+    return;
+  }
+  var connChanged = !cfg || cfg.owner!==c.owner || cfg.repo!==c.repo ||
+                    cfg.path!==c.path || cfg.branch!==c.branch || cfg.token!==c.token;
+  cfg = c; saveCfg(cfg);
+  applyFontSize(cfg.fontPx);
+  document.getElementById("listTitle").textContent = c.path.split("/").pop().replace(/\.md$/,"");
+  updateArchiveBtn();
+  if(connChanged || !model.length){
+    currentSha = null;
+    load();
+  } else {
+    // only preferences changed — keep the current list and any unsaved edits
+    document.getElementById("setup").hidden = true;
+    showApp();
+    clearAutosave();
+    if(dirty){
+      if(cfg.autosave){ setStatus("dirty","Autosaving…"); scheduleAutosave(); }
+      else setStatus("dirty","Unsaved changes");
+    } else {
+      setStatus("clean","All saved");
+    }
+  }
+};
+document.getElementById("btnCancelSetup").onclick = function(){
+  if(cfg){
+    applyFontSize(cfg.fontPx || 16);   // discard any live font preview
+    document.getElementById("setup").hidden = true; showApp();
+  }
+};
+document.getElementById("btnSave").onclick = function(){ save(false); };
+document.getElementById("btnSettings").onclick = openSetup;
+document.getElementById("msgSettings").onclick = openSetup;
+document.getElementById("autosave").onchange = updateAutosaveUI;
+document.getElementById("fontScale").oninput = function(){
+  var v = this.value;
+  document.getElementById("fontScaleVal").textContent = v + " px";
+  applyFontSize(v);                    // live preview while dragging
+};
+document.getElementById("btnUndo").onclick = undo;
+document.getElementById("btnArchive").onclick = archiveCompleted;
+document.getElementById("btnEdit").onclick = function(){
+  sectionEdit = !sectionEdit;
+  document.getElementById("btnEdit").classList.toggle("on", sectionEdit);
+  rerender();
+};
+document.getElementById("btnRefresh").onclick = function(){
+  if(dirty && !confirm("Discard unsaved changes and reload from GitHub?")) return;
+  hideMsg(); load();
+};
+
+window.addEventListener("beforeunload", function(e){
+  if(dirty){ e.preventDefault(); e.returnValue = ""; }
+});
+
+// ---------- boot ----------
+cfg = loadCfg();
+if(cfg){
+  applyFontSize(cfg.fontPx || 16);
+  document.getElementById("listTitle").textContent = (cfg.path||"To-Do").split("/").pop().replace(/\.md$/,"");
+  load();
+} else {
+  document.getElementById("path").value = "To-Do-2026.md";
+  updateAutosaveUI();   // autosave defaults on, so show the delay field
+}
+</script>
+</body>
+</html>
