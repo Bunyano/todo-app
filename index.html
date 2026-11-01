@@ -8,6 +8,9 @@
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PHJlY3QgeD0iMiIgeT0iMiIgd2lkdGg9IjI4IiBoZWlnaHQ9IjI4IiByeD0iNyIgZmlsbD0iIzViYjBhMCIvPjxwYXRoIGQ9Ik05IDE2LjVsNC41IDQuNUwyMyAxMSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjwvc3ZnPg==">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.6/Sortable.min.js" integrity="sha512-csIng5zcB+XpulRUa+ev1zKo7zRNGpEaVfNB9On1no9KYTEY/rLGAEEpvgdw6nim1WdTuihZY1eqZ31K7/fZjw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <style>
+  /* Colours and sizes are defined once here as CSS variables (e.g. --accent), then
+     referenced everywhere below as var(--accent). The light-mode block overrides the
+     same names, so the whole app re-themes just by swapping these values. */
   :root{
     --bg:#191a1d; --surface:#1f2125; --elev:#26282d;
     --ink:#e9e7e1; --muted:#9b9a95; --faint:#6f6e69;
@@ -318,18 +321,42 @@
 <script>
 "use strict";
 
-var CFG_KEY = "todo-gh-config-v1";
-var cfg = null;
-var model = [];
-var currentSha = null;
-var endsWithNewline = true;
-var dirty = false;
-var saving = false;
-var changeSeq = 0;
-var autosaveTimer = null;
-var sectionEdit = false;
+/* =====================================================================
+   HOW THIS APP WORKS (the big picture)
+   ---------------------------------------------------------------------
+   There is no server. This page runs entirely in your browser and talks
+   directly to GitHub's API. Your to-do list is just a markdown file in a
+   GitHub repo. The flow is a loop:
+
+     1. load()      fetches the markdown file's text from GitHub
+     2. parse()     turns that text into `model` — an array of little
+                    objects, one per line (see the parse section below)
+     3. render()    builds the on-screen list from `model`
+     4. you edit    -> every edit changes `model`, marks it "dirty",
+                    and re-renders
+     5. save()      turns `model` back into markdown with serialize()
+                    and writes it to GitHub
+
+   The golden rule: `model` is the single source of truth. Both the file
+   on GitHub and the list on screen are just projections of it. Nothing
+   reads the DOM to figure out the current state.
+   ===================================================================== */
+
+// --- App-wide state (these few variables hold everything the app tracks) ---
+var CFG_KEY = "todo-gh-config-v1"; // localStorage key under which settings are saved
+var cfg = null;              // your settings: {owner, repo, path, branch, token, ...} or null before setup
+var model = [];              // the list itself — the array of line-nodes described in the parse section
+var currentSha = null;       // GitHub's fingerprint of the file version we loaded (needed to save safely)
+var endsWithNewline = true;  // did the file end with a newline? remembered so we write it back the same way
+var dirty = false;           // are there unsaved changes?
+var saving = false;          // is a save currently in flight? (stops overlapping saves)
+var changeSeq = 0;           // bumped on every edit — lets a save detect edits that arrived mid-save
+var autosaveTimer = null;    // the pending debounced-autosave timer, if any
+var sectionEdit = false;     // is the section-edit mode (reorder/rename/delete sections) turned on?
 
 // ---------- storage ----------
+// Your settings (username, repo, token, preferences) live only in this browser's
+// localStorage — never on a server. CFG_KEY is just the name they're filed under.
 function loadCfg(){
   try{ var raw = localStorage.getItem(CFG_KEY); return raw ? JSON.parse(raw) : null; }
   catch(e){ return null; }
@@ -339,6 +366,8 @@ function saveCfg(c){
 }
 
 // ---------- base64 (utf-8 safe) ----------
+// GitHub's API carries file contents as base64. These convert between text and base64
+// while handling non-ASCII characters (emoji, accents) correctly.
 function utf8ToB64(str){
   var bytes = new TextEncoder().encode(str), bin = "", chunk = 0x8000;
   for(var i=0;i<bytes.length;i+=chunk){ bin += String.fromCharCode.apply(null, bytes.subarray(i,i+chunk)); }
@@ -351,6 +380,9 @@ function b64ToUtf8(b64){
 }
 
 // ---------- github api ----------
+// Thin wrappers over GitHub's "repository contents" endpoint. Note: to UPDATE a file
+// GitHub wants its current `sha` (a fingerprint of the version you're replacing). That's
+// how it catches the case where the file changed underneath you — you'd get a 409 conflict.
 function apiUrlFor(path){
   var p = path.split("/").map(encodeURIComponent).join("/");
   return "https://api.github.com/repos/"+encodeURIComponent(cfg.owner)+"/"+encodeURIComponent(cfg.repo)+"/contents/"+p;
@@ -393,6 +425,14 @@ async function ghPut(text, message){
 }
 
 // ---------- parse / serialize markdown ----------
+// `model` is a flat array of small "node" objects, one per line of the file. Each has a type:
+//   heading -> { type:"heading", level, text, notes }  e.g. "## Shopping"  (notes=true if it carries a hidden <!--notes--> flag)
+//   task    -> { type:"task",   indent, text, done }    e.g. "- [ ] milk" / "- [x] milk"
+//   bullet  -> { type:"bullet", indent, text }          e.g. "- a plain note"  (no checkbox)
+//   blank   -> { type:"blank" }                         an empty line (kept so spacing is preserved)
+//   text    -> { type:"text",   text }                  any other line, stored verbatim
+// parse() builds this array from the file text; serialize() turns it back into text.
+// Keeping EVERY line as a node (blanks included) is what lets a save reproduce the file faithfully.
 function parse(md){
   endsWithNewline = /\n$/.test(md);
   var lines = md.split("\n");
@@ -441,6 +481,8 @@ function setStatus(kind, text){
   document.getElementById("statusText").textContent = text;
 }
 function clearAutosave(){ if(autosaveTimer){ clearTimeout(autosaveTimer); autosaveTimer = null; } }
+// "Debounced" autosave: every edit restarts this timer, so we only actually commit to
+// GitHub once you've stopped editing for the configured number of seconds.
 function scheduleAutosave(){
   if(!cfg || !cfg.autosave) return;
   clearAutosave();
@@ -461,6 +503,9 @@ function applyFontSize(px){
 }
 
 // ---------- render ----------
+// render() discards the on-screen list and rebuilds it from `model`. It's deliberately
+// simple: any change edits `model` then calls render() (or rerender(), which also keeps
+// your scroll position). `el()` is a one-line helper to create an element with a class + text.
 function el(tag, cls, txt){ var e=document.createElement(tag); if(cls)e.className=cls; if(txt!=null)e.textContent=txt; return e; }
 var CHECK_SVG = '<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 var GRIP_SVG = '<svg viewBox="0 0 12 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><circle cx="3" cy="4" r="1.4"/><circle cx="9" cy="4" r="1.4"/><circle cx="3" cy="10" r="1.4"/><circle cx="9" cy="10" r="1.4"/><circle cx="3" cy="16" r="1.4"/><circle cx="9" cy="16" r="1.4"/></svg>';
@@ -473,7 +518,9 @@ function render(){
   destroySortables();
   list.innerHTML = "";
 
-  // group nodes into sections by heading
+  // Walk the flat `model` and gather it into sections: each heading starts a new group,
+  // and the task/bullet nodes that follow belong to it. (Blank/text nodes are skipped for
+  // display but still live in `model`, so they survive a save.)
   var groups = [];
   var current = {heading:null, items:[]};
   model.forEach(function(n){
@@ -490,6 +537,8 @@ function render(){
 
   groups.forEach(function(g){
     var sec = el("section","section");
+    // Stash the model node on the DOM element (__heading / __node). When SortableJS moves
+    // an element during a drag, we read these back to learn what moved and where it landed.
     sec.__heading = g.heading || null;
     if(g.heading){
       var h = el("div","sec-head");
@@ -499,6 +548,8 @@ function render(){
         h.appendChild(sgrip);
       }
       var titleSpan = el("span", sectionEdit?"editable":null, g.heading.text);
+      // The (function(head){...})(g.heading) wrapper "captures" THIS heading for the click
+      // handler. Without it, every handler in the loop would end up pointing at the last one.
       if(sectionEdit){ (function(head){ titleSpan.onclick = function(){ renameSection(head); }; })(g.heading); }
       h.appendChild(titleSpan);
       if(!sectionEdit){
@@ -566,6 +617,10 @@ function renderRow(node){
   return row;
 }
 
+// Drag-to-reorder is powered by the SortableJS library (loaded in <head>). In normal mode
+// each section's items are draggable; in section-edit mode whole sections are draggable
+// instead. On drop (onDrop / onSectionDrop) we update `model` and re-render — we never trust
+// the DOM order directly. If the library failed to load, hasSortable() is false and we skip it.
 function initSortables(){
   if(!hasSortable()) return;
   if(sectionEdit){
@@ -656,6 +711,9 @@ function renderAddRow(heading){
 }
 
 // ---------- edits ----------
+// Each of these makes one change the same way: snapshot for undo (pushUndo), mutate `model`,
+// mark dirty (which schedules a save), and re-render. toggle() also updates the done-count in
+// place for snappiness, but the model change is what actually matters.
 function toggle(node, row, chk){
   pushUndo();
   node.done = !node.done;
@@ -775,6 +833,8 @@ function rerender(){
 }
 
 // ---------- undo (last 5 changes) ----------
+// Before each change, pushUndo() stores a deep copy of `model` on a stack (capped at 5).
+// undo() pops the most recent copy back. JSON.parse(JSON.stringify(...)) is a quick deep clone.
 var undoStack = [];
 function pushUndo(){
   undoStack.push(JSON.parse(JSON.stringify(model)));
@@ -915,6 +975,8 @@ async function save(isAuto){
   if(!dirty || saving) return;
   clearAutosave();
   saving = true;
+  // Note the edit counter now. If it changes while this (async) save is in flight, you edited
+  // mid-save — so afterwards we keep the list dirty and save again instead of marking it clean.
   var seq = changeSeq;
   setStatus("busy","Saving…");
   document.getElementById("btnSave").disabled = true;
@@ -1015,6 +1077,7 @@ function openSetup(){
 }
 
 // ---------- wire up ----------
+// Connect every button to its action. This runs once, as the page loads.
 document.getElementById("btnConnect").onclick = function(){
   var c = {
     owner:  document.getElementById("owner").value.trim(),
@@ -1085,6 +1148,8 @@ window.addEventListener("beforeunload", function(e){
 });
 
 // ---------- boot ----------
+// Startup. If settings are already saved, apply them and load the list immediately.
+// Otherwise the setup panel is showing (see the HTML), so we just prime its default values.
 cfg = loadCfg();
 if(cfg){
   applyFontSize(cfg.fontPx || 16);
