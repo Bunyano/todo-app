@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#191a1d">
 <title>To-Do</title>
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PHJlY3QgeD0iMiIgeT0iMiIgd2lkdGg9IjI4IiBoZWlnaHQ9IjI4IiByeD0iNyIgZmlsbD0iIzViYjBhMCIvPjxwYXRoIGQ9Ik05IDE2LjVsNC41IDQuNUwyMyAxMSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjwvc3ZnPg==">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.6/Sortable.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.6/Sortable.min.js" integrity="sha512-csIng5zcB+XpulRUa+ev1zKo7zRNGpEaVfNB9On1no9KYTEY/rLGAEEpvgdw6nim1WdTuihZY1eqZ31K7/fZjw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <style>
   :root{
     --bg:#191a1d; --surface:#1f2125; --elev:#26282d;
@@ -267,7 +267,7 @@
 
     <label for="path">File path in the repo</label>
     <input type="text" id="path" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="to-do.md">
-    <p class="hint">Include folders if it's nested, e.g. <code>lists/to-do.md</code></p>
+    <p class="hint">Include folders if it's nested, e.g. <code>lists/To-Do-2026.md</code></p>
 
     <label for="archivePath">Completed-items file <span style="color:var(--faint)">(optional)</span></label>
     <input type="text" id="archivePath" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="done.md" value="done.md">
@@ -364,7 +364,7 @@ function headers(){
 }
 // read any file; returns {text, sha} or null if it doesn't exist (404)
 async function ghGetPath(path){
-  var res = await fetch(apiUrlFor(path)+"?ref="+encodeURIComponent(cfg.branch), {headers:headers()});
+  var res = await fetch(apiUrlFor(path)+"?ref="+encodeURIComponent(cfg.branch), {headers:headers(), cache:"no-store"});
   if(res.status===404) return null;
   if(res.status===401) throw {code:401};
   if(!res.ok) throw {code:res.status, msg:(await res.text())};
@@ -660,6 +660,7 @@ function toggle(node, row, chk){
   pushUndo();
   node.done = !node.done;
   chk.classList.toggle("done", node.done);
+  chk.setAttribute("aria-label", node.done ? "Mark not done" : "Mark done");
   row.classList.toggle("checked", node.done);
   // update the section counter (row is inside .items, which is inside .section)
   var itemsEl = row.parentNode;
@@ -944,6 +945,7 @@ async function save(isAuto){
   }
 }
 
+function retryFor(where){ return where==="save" ? save : (where==="archive" ? archiveCompleted : load); }
 function handleError(e, where){
   if(e.code===401){
     setStatus("err","Token rejected");
@@ -959,13 +961,13 @@ function handleError(e, where){
     setStatus("err","No connection");
     showMsg("📡","Can't reach GitHub",
       "Check your internet connection and try again.",
-      "Try again", function(){ hideMsg(); (where==="save"?save:load)(); });
+      "Try again", function(){ hideMsg(); retryFor(where)(); });
   } else {
     setStatus("err","Something went wrong");
     var det = e.msg ? String(e.msg).slice(0,180) : (e.message||("HTTP "+(e.code||"?")));
     showMsg("⚠️","Something went wrong",
       "GitHub returned an error. You can try again or check your settings.",
-      "Try again", function(){ hideMsg(); (where==="save"?save:load)(); }, det);
+      "Try again", function(){ hideMsg(); retryFor(where)(); }, det);
   }
 }
 
@@ -1089,7 +1091,7 @@ if(cfg){
   document.getElementById("listTitle").textContent = (cfg.path||"To-Do").split("/").pop().replace(/\.md$/,"");
   load();
 } else {
-  document.getElementById("path").value = "To-Do-2026.md";
+  document.getElementById("path").value = "to-do.md";
   updateAutosaveUI();   // autosave defaults on, so show the delay field
 }
 </script>
