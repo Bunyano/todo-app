@@ -1001,7 +1001,7 @@ function openSetup(){
   }
   document.getElementById("autosave").checked = cfg ? !!cfg.autosave : true;
   document.getElementById("autosaveDelay").value = (cfg && cfg.autosaveDelay) ? cfg.autosaveDelay : 6;
-  document.getElementById("archivePath").value = (cfg && cfg.archivePath) ? cfg.archivePath : "Done.md";
+  document.getElementById("archivePath").value = (cfg && cfg.archivePath) ? cfg.archivePath : "done.md";
   var fpx = (cfg && cfg.fontPx) ? cfg.fontPx : 16;
   document.getElementById("fontScale").value = fpx;
   document.getElementById("fontScaleVal").textContent = fpx + " px";
